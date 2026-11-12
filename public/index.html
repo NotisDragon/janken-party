@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>対戦じゃんけんパーティ</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>オンライン対戦じゃんけん</h1>
+
+    <!-- エントランス画面 -->
+    <div id="entranceScreen" class="card active">
+      <h2>スタート画面</h2>
+      <div class="input-group">
+        <label>プレイヤー名</label>
+        <input type="text" id="playerName" placeholder="名前を入力してください" maxlength="10">
+      </div>
+
+      <div class="tab-buttons">
+        <button onclick="switchTab('create')" class="tab-btn active" id="tabCreate">部屋を作成</button>
+        <button onclick="switchTab('join')" class="tab-btn" id="tabJoin">コードで参加</button>
+      </div>
+
+      <div id="createArea">
+        <button class="btn primary" onclick="createRoom()">部屋を作成してロビーへ</button>
+      </div>
+
+      <div id="joinArea" style="display: none;">
+        <div class="input-group">
+          <label>4桁の部屋コード</label>
+          <input type="text" id="roomCodeInput" placeholder="例: 1234" maxlength="4">
+        </div>
+        <button class="btn primary" onclick="joinRoom()">部屋に参加する</button>
+      </div>
+    </div>
+
+    <!-- 部屋画面 -->
+    <div id="roomScreen" class="card">
+      <div class="header-info">
+        <div>部屋コード: <strong id="roomCodeDisplay"></strong></div>
+        <div>ルール: <span id="modeDisplay"></span> (<span id="targetWinsDisplay"></span>勝先取)</div>
+      </div>
+
+      <!-- ホスト専用設定パネル -->
+      <div id="hostSettingsPanel" class="host-panel" style="display: none;">
+        <h3>【ホスト専用】ゲーム設定</h3>
+        <div class="settings-row">
+          <label>勝利数 (1~100):</label>
+          <input type="number" id="targetWinsInput" min="1" max="100" value="3" onchange="updateSettings()">
+          <label>ルール:</label>
+          <select id="gameModeSelect" onchange="updateSettings()">
+            <option value="standard">通常じゃんけん (2名用)</option>
+            <option value="majority">多数派勝ち・勝ち残り (6名以上推奨)</option>
+          </select>
+        </div>
+        <button class="btn primary" onclick="startGame()" style="margin-top:10px;">ゲームを開始する！</button>
+      </div>
+
+      <!-- 参加者一覧 (状態・勝ち数表示) -->
+      <h3>参加メンバー</h3>
+      <div id="playersList" class="players-grid"></div>
+
+      <!-- 非ホスト待機メッセージ -->
+      <div id="waitingHostMsg" class="alert-info" style="display: none;">
+        ホストがゲームを開始するのを待っています...
+      </div>
+
+      <!-- ゲームプレイエリア -->
+      <div id="gamePlayArea" style="display: none;">
+        <hr>
+        <div id="eliminatedMsg" class="alert-warning" style="display: none;">
+          あなたは脱落しました。他プレイヤーの勝負を観戦中です...
+        </div>
+
+        <div id="handSelectionBox">
+          <h3>出す手を選んでください</h3>
+          <div class="hand-buttons">
+            <button class="circle-btn" onclick="selectHand('rock')">
+              <svg viewBox="0 0 100 100" class="hand-icon"><circle cx="50" cy="50" r="45" fill="#e74c3c"/><text x="50" y="65" font-size="45" text-anchor="middle" fill="white">✊</text></svg>
+              <span>グー</span>
+            </button>
+            <button class="circle-btn" onclick="selectHand('scissors')">
+              <svg viewBox="0 0 100 100" class="hand-icon"><circle cx="50" cy="50" r="45" fill="#2ecc71"/><text x="50" y="65" font-size="45" text-anchor="middle" fill="white">✌️</text></svg>
+              <span>チョキ</span>
+            </button>
+            <button class="circle-btn" onclick="selectHand('paper')">
+              <svg viewBox="0 0 100 100" class="hand-icon"><circle cx="50" cy="50" r="45" fill="#3498db"/><text x="50" y="65" font-size="45" text-anchor="middle" fill="white">🖐️</text></svg>
+              <span>パー</span>
+            </button>
+          </div>
+        </div>
+        <p id="statusMsg" style="text-align: center;">選択を待っています...</p>
+      </div>
+
+      <!-- ラウンド/結果画面 -->
+      <div id="resultArea" style="display: none;">
+        <hr>
+        <h2 id="resultTitle" style="text-align: center;">結果発表</h2>
+        <div id="resultDetails"></div>
+        
+        <button class="btn secondary" onclick="nextRound()" id="nextRoundBtn">次のラウンドへ</button>
+        <button class="btn primary" onclick="returnToLobbyIndividual()" id="returnLobbyBtn" style="margin-top: 10px;">ロビーに戻る</button>
+      </div>
+
+      <!-- チャット機能 -->
+      <hr style="margin-top: 20px;">
+      <h3>部屋チャット</h3>
+      <div class="chat-box" id="chatBox"></div>
+      <div class="chat-input-group">
+        <input type="text" id="chatInput" placeholder="メッセージを入力..." onkeypress="handleChatKeyPress(event)">
+        <button onclick="sendChatMessage()" class="btn-sm">送信</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
