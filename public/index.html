@@ -38,6 +38,10 @@
 
     <!-- 部屋画面 -->
     <div id="roomScreen" class="card">
+      <div class="top-bar">
+        <button class="btn-leave" onclick="leaveRoom()">← 部屋を退出（名前変更・別部屋へ）</button>
+      </div>
+
       <div class="header-info">
         <div>部屋コード: <strong id="roomCodeDisplay"></strong></div>
         <div>ルール: <span id="modeDisplay"></span> (<span id="targetWinsDisplay"></span>勝先取)</div>
@@ -51,14 +55,14 @@
           <input type="number" id="targetWinsInput" min="1" max="100" value="3" onchange="updateSettings()">
           <label>ルール:</label>
           <select id="gameModeSelect" onchange="updateSettings()">
-            <option value="standard">通常じゃんけん (2名用)</option>
-            <option value="majority">多数派勝ち・勝ち残り (6名以上推奨)</option>
+            <option value="standard">通常じゃんけん (全員参加)</option>
+            <option value="majority">多数派勝ち・勝ち残り戦</option>
           </select>
         </div>
         <button class="btn primary" onclick="startGame()" style="margin-top:10px;">ゲームを開始する！</button>
       </div>
 
-      <!-- 参加者一覧 (状態・勝ち数表示) -->
+      <!-- 参加者一覧 -->
       <h3>参加メンバー</h3>
       <div id="playersList" class="players-grid"></div>
 
@@ -67,11 +71,11 @@
         ホストがゲームを開始するのを待っています...
       </div>
 
-      <!-- ゲームプレイエリア -->
+      <!-- ゲームプレイ・観戦エリア -->
       <div id="gamePlayArea" style="display: none;">
         <hr>
         <div id="eliminatedMsg" class="alert-warning" style="display: none;">
-          あなたは脱落しました。他プレイヤーの勝負を観戦中です...
+          👀 あなたは脱落しました。決着がつくまで観戦中です...
         </div>
 
         <div id="handSelectionBox">
@@ -101,7 +105,7 @@
         <div id="resultDetails"></div>
         
         <button class="btn secondary" onclick="nextRound()" id="nextRoundBtn">次のラウンドへ</button>
-        <button class="btn primary" onclick="returnToLobbyIndividual()" id="returnLobbyBtn" style="margin-top: 10px;">ロビーに戻る</button>
+        <button class="btn primary" onclick="returnToLobbyIndividual()" id="returnLobbyBtn" style="display: none; margin-top: 10px;">ロビーに戻る</button>
       </div>
 
       <!-- チャット機能 -->

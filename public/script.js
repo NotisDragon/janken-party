@@ -26,8 +26,23 @@ function joinRoom() {
 socket.on('joinedSuccess', (data) => {
   currentRoomCode = data.roomCode;
   isHost = data.isHost;
+  document.getElementById('chatBox').innerHTML = '';
   document.getElementById('entranceScreen').classList.remove('active');
   document.getElementById('roomScreen').classList.add('active');
+});
+
+// 部屋から退出して最初の画面へ戻る
+function leaveRoom() {
+  socket.emit('leaveRoom');
+}
+
+socket.on('leftRoomSuccess', () => {
+  currentRoomCode = '';
+  isHost = false;
+  myHandSelected = false;
+  isMyEliminated = false;
+  document.getElementById('roomScreen').classList.remove('active');
+  document.getElementById('entranceScreen').classList.add('active');
 });
 
 function updateSettings() {
@@ -42,7 +57,7 @@ function startGame() {
   socket.emit('startGame', { roomCode: currentRoomCode });
 }
 
-// 部屋ステータスの同期処理 (勝敗・〇勝のスコア更新)
+// 部屋ステータスの同期処理
 socket.on('roomUpdated', (data) => {
   currentRoomCode = data.roomCode;
   isHost = (socket.id === data.hostId);
@@ -50,29 +65,32 @@ socket.on('roomUpdated', (data) => {
   document.getElementById('roomCodeDisplay').innerText = data.roomCode;
   document.getElementById('targetWinsDisplay').innerText = data.targetWins;
   
-  const modeText = (data.gameMode === 'majority') ? '多数派勝ち（勝ち残り）' : '通常対戦';
+  const modeText = (data.gameMode === 'majority') ? '多数派勝ち（勝ち残り）' : '通常じゃんけん';
   document.getElementById('modeDisplay').innerText = modeText;
 
-  // 自分自身のプレイヤー情報
+  if (isHost) {
+    document.getElementById('targetWinsInput').value = data.targetWins;
+    document.getElementById('gameModeSelect').value = data.gameMode;
+  }
+
   const me = data.players.find(p => p.id === socket.id);
   const myStatus = me ? me.status : 'lobby';
+  isMyEliminated = me ? me.isEliminated : false;
 
-  // ホストコントロール表示
   document.getElementById('hostSettingsPanel').style.display = (isHost && data.status === 'lobby') ? 'block' : 'none';
   document.getElementById('waitingHostMsg').style.display = (!isHost && data.status === 'lobby') ? 'block' : 'none';
 
-  // 画面の表示切替（自分がロビーなら他画面は非表示）
   if (myStatus === 'lobby') {
     document.getElementById('gamePlayArea').style.display = 'none';
     document.getElementById('resultArea').style.display = 'none';
   }
 
-  // 参加者カードリストと「〇勝」スコアのリアルタイム再描写
+  // 参加者カードリスト描画
   const grid = document.getElementById('playersList');
   grid.innerHTML = data.players.map(p => {
     let statusBadge = '';
     if (p.status === 'lobby') statusBadge = '<span class="player-status-badge lobby">ロビー待機</span>';
-    else if (p.isEliminated) statusBadge = '<span class="player-status-badge eliminated">脱落</span>';
+    else if (p.isEliminated) statusBadge = '<span class="player-status-badge eliminated">観戦中（脱落）</span>';
     else statusBadge = '<span class="player-status-badge playing">対戦中</span>';
 
     return `
@@ -86,21 +104,41 @@ socket.on('roomUpdated', (data) => {
 });
 
 socket.on('gameStarted', () => {
-  myHandSelected = false;
-  isMyEliminated = false;
-  disableHandButtons(false);
-  document.getElementById('gamePlayArea').style.display = 'block';
-  document.getElementById('handSelectionBox').style.display = 'block';
-  document.getElementById('eliminatedMsg').style.display = 'none';
-  document.getElementById('resultArea').style.display = 'none';
-  document.getElementById('statusMsg').innerText = '手を選択してください';
+  preparePlayScreen();
 });
+
+socket.on('forceNextRound', () => {
+  preparePlayScreen();
+});
+
+socket.on('forceReturnToLobby', () => {
+  document.getElementById('gamePlayArea').style.display = 'none';
+  document.getElementById('resultArea').style.display = 'none';
+});
+
+function preparePlayScreen() {
+  myHandSelected = false;
+  document.getElementById('resultArea').style.display = 'none';
+  document.getElementById('gamePlayArea').style.display = 'block';
+
+  if (isMyEliminated) {
+    // 観戦モード表示（ロビーには戻さない）
+    document.getElementById('eliminatedMsg').style.display = 'block';
+    document.getElementById('handSelectionBox').style.display = 'none';
+    document.getElementById('statusMsg').innerText = '生き残っているプレイヤーの選択を待っています...';
+  } else {
+    document.getElementById('eliminatedMsg').style.display = 'none';
+    document.getElementById('handSelectionBox').style.display = 'block';
+    disableHandButtons(false);
+    document.getElementById('statusMsg').innerText = '手を選択してください';
+  }
+}
 
 function selectHand(hand) {
   if (myHandSelected || isMyEliminated) return;
   myHandSelected = true;
   disableHandButtons(true);
-  document.getElementById('statusMsg').innerText = '相手の選択を待っています...';
+  document.getElementById('statusMsg').innerText = '他のプレイヤーの選択を待っています...';
   socket.emit('submitHand', { roomCode: currentRoomCode, hand });
 }
 
@@ -109,62 +147,70 @@ function disableHandButtons(disabled) {
 }
 
 socket.on('handSubmittedCount', ({ submitted, total }) => {
-  if (myHandSelected && !isMyEliminated) {
-    document.getElementById('statusMsg').innerText = `全員の選択を待っています (${submitted}/${total})`;
+  if (myHandSelected || isMyEliminated) {
+    document.getElementById('statusMsg').innerText = `対戦者の選択を待っています (${submitted}/${total})`;
   }
 });
 
 // ラウンド結果表示
-socket.on('roundResult', ({ hands, result, players, effectiveMode, gameOver, matchWinner, survivingPlayers }) => {
+socket.on('roundResult', ({ hands, result, roomGameMode, effectiveMode, gameOver, matchWinner, setReset, survivingPlayers }) => {
   document.getElementById('gamePlayArea').style.display = 'none';
   document.getElementById('resultArea').style.display = 'block';
 
   const details = document.getElementById('resultDetails');
   const handMap = { rock: '✊グー', scissors: '✌️チョキ', paper: '🖐️パー' };
 
-  let html = `<p style="font-size:14px; color:#666;">（ルール: ${effectiveMode === 'majority' ? '多数派勝ち残り' : '通常対戦'}）</p><br>`;
+  let html = `<p style="font-size:14px; color:#666;">（判定ルール: ${effectiveMode === 'majority' ? '多数派勝ち残り' : '通常じゃんけん'}）</p><br>`;
   hands.forEach(h => {
     html += `<p><strong>${h.name}</strong>: ${handMap[h.hand]}</p>`;
   });
 
   html += '<br>';
   if (result.isDraw) {
-    html += `<p style="color:#f59e0b; font-weight:bold;">引き分け！</p>`;
+    html += `<p style="color:#f59e0b; font-weight:bold;">あいこ！もう一度勝負！</p>`;
   } else {
     const winnerNames = hands.filter(h => result.winners.includes(h.id)).map(h => h.name).join(', ');
-    html += `<p style="color:#10b981; font-weight:bold;">勝ち残り勝者: ${winnerNames}！</p>`;
+    if (roomGameMode === 'majority') {
+      html += `<p style="color:#10b981; font-weight:bold;">勝ち残り: ${winnerNames}！</p>`;
+    } else {
+      html += `<p style="color:#10b981; font-weight:bold;">勝者: ${winnerNames}！</p>`;
+    }
   }
 
-  // 自分が脱落したか確認
-  if (effectiveMode === 'majority' && !survivingPlayers.includes(socket.id)) {
-    isMyEliminated = true;
+  // 自分が勝ち残り戦で脱落したか判定
+  if (roomGameMode === 'majority' && !setReset && !gameOver) {
+    isMyEliminated = !survivingPlayers.includes(socket.id);
+  } else {
+    isMyEliminated = false;
   }
 
   if (gameOver) {
     html += `<br><h2 style="color:#e74c3c;">🏆 最終勝利者: ${matchWinner.name} 🏆</h2>`;
     document.getElementById('nextRoundBtn').style.display = 'none';
+    document.getElementById('returnLobbyBtn').style.display = 'block';
   } else {
-    if (isMyEliminated) {
-      html += `<p style="color:#e74c3c; margin-top:10px;">あなたは脱落しました。「ロビーに戻る」を押して待機できます。</p>`;
-      document.getElementById('nextRoundBtn').style.display = 'none';
+    document.getElementById('returnLobbyBtn').style.display = 'none';
+    document.getElementById('nextRoundBtn').style.display = 'block';
+
+    if (setReset) {
+      html += `<p style="color:#4f46e5; font-weight:bold; margin-top:10px;">🎉 1人が勝ち残りました！観戦していた全員が試合に復帰します！</p>`;
+      document.getElementById('nextRoundBtn').innerText = '全員復帰して次のラウンドへ';
+    } else if (isMyEliminated) {
+      html += `<p style="color:#d97706; font-weight:bold; margin-top:10px;">👀 あなたは脱落しました。次の画面で決着まで観戦できます。</p>`;
+      document.getElementById('nextRoundBtn').innerText = '観戦画面へ進む';
     } else {
-      document.getElementById('nextRoundBtn').style.display = 'block';
+      document.getElementById('nextRoundBtn').innerText = '次のラウンドへ';
     }
   }
 
-  document.getElementById('returnLobbyBtn').style.display = 'block';
   details.innerHTML = html;
 });
 
 function nextRound() {
-  myHandSelected = false;
-  disableHandButtons(false);
-  document.getElementById('gamePlayArea').style.display = 'block';
-  document.getElementById('resultArea').style.display = 'none';
-  document.getElementById('statusMsg').innerText = '手を選択してください';
+  preparePlayScreen();
 }
 
-// 個人ごとのロビー復帰
+// 個人ごとのロビー復帰（試合完全終了時のみ表示）
 function returnToLobbyIndividual() {
   socket.emit('returnToLobbyIndividual', { roomCode: currentRoomCode });
 }
@@ -174,7 +220,7 @@ socket.on('individualReturnedToLobby', () => {
   document.getElementById('gamePlayArea').style.display = 'none';
 });
 
-// チャット受信
+// チャット処理
 function sendChatMessage() {
   const input = document.getElementById('chatInput');
   const message = input.value.trim();

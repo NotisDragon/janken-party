@@ -5,6 +5,10 @@ body { background-color: #f0f2f5; display: flex; justify-content: center; paddin
 .card.active { display: block; }
 h1, h2, h3 { text-align: center; margin-bottom: 16px; color: #333; }
 
+.top-bar { display: flex; justify-content: flex-start; margin-bottom: 12px; }
+.btn-leave { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 6px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; font-weight: bold; }
+.btn-leave:hover { background: #e2e8f0; color: #1e293b; }
+
 .input-group { margin-bottom: 16px; }
 .input-group label { display: block; margin-bottom: 6px; font-weight: bold; color: #555; }
 .input-group input, .input-group select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
